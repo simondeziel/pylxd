@@ -279,6 +279,32 @@ class TestStorageVolume(testing.PyLXDTestCase):
         a_storage_pool = models.StoragePool(self.client, name="lxd")
         a_volume = a_storage_pool.volumes.get("custom", "cu1")
         a_volume.delete()
+        # Verify the DELETE request was made
+        delete_requests = [
+            request
+            for request in self.requests_mock.request_history
+            if request.method == "DELETE"
+            and request.url
+            == "http://pylxd.test/1.0/storage-pools/lxd/volumes/custom/cu1"
+        ]
+        self.assertTrue(delete_requests)
+
+        # After deletion, GET should return 404
+        def volume_not_found(request, context):
+            context.status_code = 404
+            return json.dumps(
+                {"type": "error", "error": "Not found", "error_code": 404}
+            )
+
+        self.add_rule(
+            {
+                "text": volume_not_found,
+                "method": "GET",
+                "url": r"^http://pylxd.test/1.0/storage-pools/lxd/volumes/custom/cu1$",
+            }
+        )
+        with self.assertRaises(exceptions.NotFound):
+            a_storage_pool.volumes.get("custom", "cu1")
 
     def test_eq_same_name_type_pool(self):
         """Two volumes with same name, type, and pool (no project) are equal."""
