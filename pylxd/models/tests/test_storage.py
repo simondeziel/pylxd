@@ -271,8 +271,19 @@ class TestStorageVolume(testing.PyLXDTestCase):
         testing.add_api_extension_helper(self, ["storage"])
         a_storage_pool = models.StoragePool(self.client, name="lxd")
         a_volume = a_storage_pool.volumes.get("custom", "cu1")
-        a_volume.config = {"size": 2}
+        a_volume.config = {"size": "2097152"}  # 2 MiB in bytes
         a_volume.save()
+        # Verify the PUT request was made with the expected payload
+        put_requests = [
+            request
+            for request in self.requests_mock.request_history
+            if request.method == "PUT"
+            and request.url
+            == "http://pylxd.test/1.0/storage-pools/lxd/volumes/custom/cu1"
+        ]
+        self.assertTrue(put_requests)
+        put_body = json.loads(put_requests[-1].text)
+        self.assertEqual(put_body["config"]["size"], "2097152")
 
     def test_delete(self):
         testing.add_api_extension_helper(self, ["storage"])
